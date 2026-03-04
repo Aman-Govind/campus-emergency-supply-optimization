@@ -1,25 +1,50 @@
-<<<<<<< HEAD
 # Campus Emergency Supply Distribution Optimization
 
-This project solves an optimization problem for distributing emergency supplies across campus facilities.
+This project solves an optimization problem for distributing emergency supplies across campus facilities using **Mixed Integer Linear Programming (MILP)** implemented in Python with the **PuLP** optimization library.
 
 ## Objective
-Minimize total annual cost while satisfying demand and capacity constraints.
+
+Minimize the **total annual cost** of distributing supplies while satisfying:
+
+- Facility demand
+- Warehouse capacity constraints
+- Budget limitations
 
 ## Tools Used
+
 - Python
 - PuLP
 - Pandas
 
+## Project Structure
+campus-emergency-supply-optimization
+│
+├── data
+│ ├── facilities.csv
+│ ├── warehouses.csv
+│ ├── transportation_costs.csv
+│ ├── demands.csv
+│
+├── src
+│ └── optimization.py
+│
+└── README.md
+
+
 ## How to Run
 
-Install dependencies
-
+Install dependencies:
 pip install pandas pulp
 
-Run program
 
+Run the optimization model:
 python src/optimization.py
-=======
-# campus-emergency-supply-optimization
->>>>>>> 2c0a6f23a2468920a91befcb7291357655c9f334
+
+
+## Output
+
+The program computes:
+
+- Optimal warehouse selection
+- Shipment quantities to each facility
+- Cost breakdown for transportation, construction, and operations
