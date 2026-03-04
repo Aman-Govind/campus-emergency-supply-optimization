@@ -1,0 +1,175 @@
+import pandas as pd
+import pulp
+
+# -----------------------------
+# PARAMETERS
+# -----------------------------
+days = 365
+budget = 1500000
+
+# -----------------------------
+# LOAD DATA
+# -----------------------------
+facilities = pd.read_csv("../data/facilities.csv")
+demands = pd.read_csv("../data/demands.csv")
+warehouses = pd.read_csv("../data/warehouses.csv")
+transport = pd.read_csv("../data/transportation_costs.csv")
+
+# Remove extra spaces from column names
+facilities.columns = facilities.columns.str.strip()
+demands.columns = demands.columns.str.strip()
+warehouses.columns = warehouses.columns.str.strip()
+transport.columns = transport.columns.str.strip()
+
+# -----------------------------
+# MERGE FACILITY + DEMAND
+# -----------------------------
+facilities = pd.merge(facilities, demands, on="facility_id")
+
+# Annual demand
+facilities["annual_demand"] = facilities["daily_demand"] * days
+
+# -----------------------------
+# DETECT CAPACITY COLUMN
+# -----------------------------
+capacity_column = None
+
+for col in warehouses.columns:
+    if "capacity" in col.lower():
+        capacity_column = col
+        break
+
+if capacity_column is None:
+    raise Exception("Capacity column not found in warehouses.csv")
+
+# Annual capacity
+warehouses["annual_capacity"] = warehouses[capacity_column] * days
+
+# -----------------------------
+# DETECT COST COLUMNS
+# -----------------------------
+construction_col = None
+operation_col = None
+
+for col in warehouses.columns:
+    if "construction" in col.lower():
+        construction_col = col
+    if "operational" in col.lower() or "operation" in col.lower():
+        operation_col = col
+
+if construction_col is None or operation_col is None:
+    raise Exception("Cost columns not found in warehouses.csv")
+
+# -----------------------------
+# CREATE TRANSPORT COST DICTIONARY
+# -----------------------------
+cost_dict = {}
+
+for _, row in transport.iterrows():
+    cost_dict[(row["from_warehouse"], row["to_facility"])] = row["cost_per_unit"]
+
+# -----------------------------
+# CREATE OPTIMIZATION MODEL
+# -----------------------------
+model = pulp.LpProblem("Campus_Emergency_Distribution", pulp.LpMinimize)
+
+# Decision variables
+ship = pulp.LpVariable.dicts(
+    "Ship",
+    [(w, f) for w in warehouses["warehouse_id"]
+            for f in facilities["facility_id"]],
+    lowBound=0
+)
+
+open_w = pulp.LpVariable.dicts(
+    "OpenWarehouse",
+    warehouses["warehouse_id"],
+    cat="Binary"
+)
+
+# -----------------------------
+# OBJECTIVE FUNCTION
+# -----------------------------
+
+# Transportation cost
+transport_cost = pulp.lpSum(
+    ship[w, f] * cost_dict[(w, f)]
+    for w in warehouses["warehouse_id"]
+    for f in facilities["facility_id"]
+)
+
+# Construction cost (amortized over 10 years)
+construction_cost = pulp.lpSum(
+    open_w[w] *
+    warehouses.loc[warehouses["warehouse_id"] == w, construction_col].values[0] / 10
+    for w in warehouses["warehouse_id"]
+)
+
+# Operational cost
+operational_cost = pulp.lpSum(
+    open_w[w] *
+    warehouses.loc[warehouses["warehouse_id"] == w, operation_col].values[0] * days
+    for w in warehouses["warehouse_id"]
+)
+
+# Total cost
+model += transport_cost + construction_cost + operational_cost
+
+# -----------------------------
+# CONSTRAINTS
+# -----------------------------
+
+# Demand satisfaction
+for f in facilities["facility_id"]:
+    demand = facilities.loc[
+        facilities["facility_id"] == f, "annual_demand"
+    ].values[0]
+
+    model += pulp.lpSum(
+        ship[w, f] for w in warehouses["warehouse_id"]
+    ) == demand
+
+# Warehouse capacity constraint
+for w in warehouses["warehouse_id"]:
+    capacity = warehouses.loc[
+        warehouses["warehouse_id"] == w, "annual_capacity"
+    ].values[0]
+
+    model += pulp.lpSum(
+        ship[w, f] for f in facilities["facility_id"]
+    ) <= capacity * open_w[w]
+
+# Exactly 2 warehouses must be selected
+model += pulp.lpSum(open_w[w] for w in warehouses["warehouse_id"]) == 2
+
+# Budget constraint
+model += transport_cost + construction_cost + operational_cost <= budget
+
+# -----------------------------
+# SOLVE MODEL
+# -----------------------------
+model.solve()
+
+# -----------------------------
+# RESULTS
+# -----------------------------
+print("\nStatus:", pulp.LpStatus[model.status])
+
+print("\nSelected Warehouses:")
+for w in warehouses["warehouse_id"]:
+    if open_w[w].value() == 1:
+        print(" ", w)
+
+print("\nShipment Plan:")
+for w in warehouses["warehouse_id"]:
+    for f in facilities["facility_id"]:
+        val = ship[w, f].value()
+        if val and val > 0:
+            print(f"{w} -> {f} : {val:.2f} units")
+
+print("\nCost Breakdown")
+print("------------------")
+print("Transportation Cost :", pulp.value(transport_cost))
+print("Construction Cost   :", pulp.value(construction_cost))
+print("Operational Cost    :", pulp.value(operational_cost))
+print("Total Cost          :", pulp.value(model.objective))
