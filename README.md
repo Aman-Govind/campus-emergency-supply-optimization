@@ -16,20 +16,6 @@ Minimize the **total annual cost** of distributing supplies while satisfying:
 - PuLP
 - Pandas
 
-## Project Structure
-campus-emergency-supply-optimization
-│
-├── data
-│ ├── facilities.csv
-│ ├── warehouses.csv
-│ ├── transportation_costs.csv
-│ ├── demands.csv
-│
-├── src
-│ └── optimization.py
-│
-└── README.md
-
 
 ## How to Run
 
