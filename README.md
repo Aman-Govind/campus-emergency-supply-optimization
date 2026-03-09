@@ -17,6 +17,8 @@ Minimize the **total annual cost** of distributing supplies while satisfying:
 - Pandas
 
 ## Project Structure
+
+
 campus-emergency-supply-optimization
 │
 ├── data
@@ -34,10 +36,14 @@ campus-emergency-supply-optimization
 ## How to Run
 
 Install dependencies:
+
+
 pip install pandas pulp
 
 
 Run the optimization model:
+
+
 python src/optimization.py
 
 
